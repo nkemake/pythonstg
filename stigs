@@ -1,0 +1,47 @@
+import xml.etree.ElementTree as ET
+
+def get_file_path(prompt):
+    return input(prompt).strip()
+
+def get_vuln_num(vuln_elem):
+    for stig_data in vuln_elem.findall(".//STIG_DATA"):
+        attr = stig_data.find("VULN_ATTRIBUTE")
+        data = stig_data.find("ATTRIBUTE_DATA")
+        if attr is not None and attr.text == "Vuln_Num" and data is not None:
+            return data.text
+    return None
+
+def copy_comments(source_path, target_path, output_path):
+    source_tree = ET.parse(source_path)
+    source_root = source_tree.getroot()
+
+    target_tree = ET.parse(target_path)
+    target_root = target_tree.getroot()
+
+    source_vulns = source_root.findall(".//VULN")
+    target_vulns = target_root.findall(".//VULN")
+
+    # Build a map of Vuln_Num -> Comments
+    source_map = {}
+    for vuln in source_vulns:
+        vuln_num = get_vuln_num(vuln)
+        comments = vuln.find("COMMENTS")
+        if vuln_num and comments is not None:
+            source_map[vuln_num] = comments.text
+
+    # Apply comments to matching Vuln_Num in the target file
+    for vuln in target_vulns:
+        vuln_num = get_vuln_num(vuln)
+        comments_elem = vuln.find("COMMENTS")
+        if vuln_num in source_map and comments_elem is not None:
+            comments_elem.text = source_map[vuln_num]
+
+    # Save the updated file
+    target_tree.write(output_path, encoding="utf-8", xml_declaration=True)
+    print(f"Comments copied and saved to {output_path}")
+
+if __name__ == "__main__":
+    file1 = get_file_path("Enter path to file1.ckl (source of comments): ")
+    file2 = get_file_path("Enter path to file2.ckl (destination for comments): ")
+    output_file = get_file_path("Enter name for the output file (e.g., file3.ckl): ")
+    copy_comments(file1, file2, output_file)
